@@ -1,0 +1,10 @@
+.link {
+  font-size: 1.15rem;
+  cursor: pointer;
+  margin: 0.5rem 0;
+  border-bottom: 1px solid transparent;
+}
+
+.link:hover {
+  border-bottom: 1px solid crimson;
+}
