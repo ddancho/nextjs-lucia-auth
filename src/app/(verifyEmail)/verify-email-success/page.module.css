@@ -5,6 +5,10 @@
   margin: 20px 0;
 }
 
+.main h1 {
+  text-align: center;
+}
+
 .main p {
   text-align: center;
   font-size: 1.5rem;

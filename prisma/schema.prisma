@@ -8,26 +8,42 @@ datasource db {
 }
 
 model User {
-  id            String @id
-  username      String @db.VarChar()
-  email         String @unique @db.VarChar()
-  salt          String @db.VarChar()
-  password_hash String @db.VarChar()
+  id           String @id
+  username     String @db.VarChar()
+  email        String @unique @db.VarChar()
+  salt         String @db.VarChar()
+  passwordHash String @map("password_hash") @db.VarChar()
 
   updatedAt DateTime @updatedAt @map("updated_at")
   createdAt DateTime @default(now()) @map("created_at")
 
   sessions Session[]
+  account  Account?
 
   @@map("Users")
 }
 
 model Session {
   id        String   @id
-  userId    String
+  userId    String   @map("user_id")
   expiresAt DateTime @map("expires_at")
 
   user User @relation(references: [id], fields: [userId], onDelete: Cascade)
 
   @@map("Sessions")
+}
+
+model Account {
+  id              String  @id @default(cuid())
+  token           String  @unique @db.VarChar()
+  verifyExpiresAt String  @map("verify_expires_at") @db.VarChar()
+  isEmailVerified Boolean @default(false) @map("is_email_verified")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(references: [id], fields: [userId], onDelete: Cascade)
+  userId String @unique @db.VarChar()
+
+  @@map("Accounts")
 }

@@ -14,9 +14,17 @@ services:
 
   adminer:
     image: adminer
+    container_name: adminer_lucia_auth_container
     restart: always
     ports:
       - 8080:8080
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog_lucia_auth_container
+    ports:
+      - 8025:8025
+      - 1025:1025
 
 volumes:
   postgres-data:

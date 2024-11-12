@@ -9,6 +9,14 @@ import { getErrorMessage } from "@/util/helpers";
 import crypto from "crypto";
 import prisma from "@/lib/prismaClient";
 import validateRequest from "@/util/auth";
+import { ASSERT } from "@/asserts/assert";
+import { isEnvValueNotEmptyString } from "@/asserts/assert";
+import {
+  createVerifiedExpiredToken,
+  createVerifyEmailUrl,
+} from "@/actions/verifyToken";
+import { SendEmailInfo } from "@/types";
+import { sendEmail } from "@/actions/email";
 
 export async function login(userData: unknown): Promise<ServerResponse> {
   const result = UserSignInSchema.safeParse(userData);
@@ -34,6 +42,9 @@ export async function login(userData: unknown): Promise<ServerResponse> {
     const user = await prisma.user.findUniqueOrThrow({
       where: {
         email: result.data.email,
+        account: {
+          isEmailVerified: true,
+        },
       },
     });
 
@@ -41,7 +52,7 @@ export async function login(userData: unknown): Promise<ServerResponse> {
     const salt = user.salt;
     const hash = await hashPassword(result.data.password, salt);
 
-    if (hash !== user.password_hash) {
+    if (hash !== user.passwordHash) {
       response = {
         status: "error",
         message: "Incorrect email or password",
@@ -112,18 +123,72 @@ export async function register(newUser: unknown): Promise<ServerResponse> {
     }
 
     // if not, insert new user in the db
+    // prepare user info
     const salt = crypto.randomBytes(128).toString("base64");
     const passwordHash = await hashPassword(result.data.password, salt);
     const userId = generateIdFromEntropySize(10);
 
-    await prisma.user.create({
-      data: {
-        id: userId,
-        username: result.data.username,
-        email: result.data.email,
-        salt,
-        password_hash: passwordHash,
-      },
+    // prepare account info
+    // 2 min expire time
+    ASSERT(
+      isEnvValueNotEmptyString(process.env.VERIFY_EXPIRES_IN),
+      "VERIFY_EXPIRES_IN throws error!"
+    );
+
+    // full date expiration timestamp
+    const verifyExpiresAt = (
+      Date.now() + parseInt(process.env.VERIFY_EXPIRES_IN)
+    ).toString();
+
+    const token = await createVerifiedExpiredToken(verifyExpiresAt);
+
+    const verifyEmailUrl = await createVerifyEmailUrl(token);
+
+    ASSERT(
+      isEnvValueNotEmptyString(process.env.NO_REPLAY_EMAIL),
+      "NO_REPLAY_EMAIL throws error!"
+    );
+    const fromNoReplay = process.env.NO_REPLAY_EMAIL;
+
+    const textMsg = `Confirm your email address, Click me! : ${verifyEmailUrl}`;
+    const htmlMsg = `
+    <p>
+        <a
+          href="${verifyEmailUrl}" 
+        >
+          Confirm your email address, Click me!
+        </a>
+      </p>
+    `;
+
+    const email: SendEmailInfo = {
+      from: fromNoReplay,
+      to: result.data.email,
+      subject: "Confirm email address",
+      html: htmlMsg,
+      text: textMsg,
+    };
+
+    // transaction, create account, user, send email
+    // should rollback in the case of error
+    await prisma.$transaction(async (tx) => {
+      await tx.account.create({
+        data: {
+          token,
+          verifyExpiresAt,
+          user: {
+            create: {
+              id: userId,
+              username: result.data.username,
+              email: result.data.email,
+              salt,
+              passwordHash: passwordHash,
+            },
+          },
+        },
+      });
+
+      await sendEmail(email);
     });
 
     response = {

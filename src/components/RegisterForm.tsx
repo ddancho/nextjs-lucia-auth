@@ -34,7 +34,9 @@ function RegisterForm() {
       return;
     }
 
-    toast.success("You are successfully signed up. Go and sign in.");
+    toast.success(
+      "You are successfully signed up. Check your email inbox for confirmation email."
+    );
     router.push("/login");
     reset();
   };

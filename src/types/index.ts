@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Session, User } from "lucia";
+import Mail from "nodemailer/lib/mailer";
 
 export const UserSignUpSchema = z
   .object({
@@ -56,3 +57,7 @@ export const routes = {
 } as const;
 
 export type Routes = (typeof routes)[keyof typeof routes];
+
+export type SendEmailInfo = Required<
+  Pick<Mail.Options, "from" | "to" | "subject" | "text" | "html">
+>;
